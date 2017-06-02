@@ -1,0 +1,20 @@
+[
+  {
+    "question":"What is life? Blah blah",
+    "occurance": 2
+  },
+
+  {
+    "question":"What is this?",
+    "occurance": 1
+  },
+  {
+    "question":"Why am I writing this program?",
+    "occurance": 1
+  },
+  {
+    "question":"Why am I so out of questions when I need them?",
+    "occurance": 2
+  }
+
+]

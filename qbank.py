@@ -1,47 +1,117 @@
-def removePunctuation(text):
-    import string
-    di = {ord(c) : None for c in string.punctuation}
-    tab = str.maketrans(di)
-    return text.translate(tab)
+import sqlite3
+import json
+import qcomp
 
-def getStopWords():
-    with open('minimal_stop.txt') as f:
-        stop = f.read().strip()
-        stop = stop.split()
-        stop = [w for w in stop if w != '']  # remove all blank ones
-    return stop
+#dict indices
+QUESTION = 'question'
+OCCURANCE = 'occurance'
 
-stopWords = getStopWords()
+# JSON Schema for the json entries in the DB
+#
+# [
+#   {
+#       "text":"Question blah blah"
+#       "occurance": 2
+#   }
+# ]
+#
+#
 
-def compareStr(str1, str2):
-    str1, str2 = removePunctuation(str1), removePunctuation(str2)
-    str1_words = str1.split()  # splitting on whitespaces(default action)
-    str2_words = str2.split()
+class Question:
+    def __init__(self, text, occurance):
+        self.text = text
+        self.occurance = occurance
 
-    #covert to lower case
-    str1_words = [w.lower() for w in str1_words]
-    str2_words = [w.lower() for w in str2_words]
+    def incrOccurance(self, incrBy = 1):
+        self.occurance += incrBy
 
-    print("Words after removing punctuations : ")
-    print(str1_words)
-    print(str2_words)
-    print()
-    #remove all the commonly occuring words
-    str1_words = [word for word in str1_words if word not in stopWords]
-    str2_words = [word for word in str2_words if word not in stopWords]
-    print("Words after removing stop words : ")
-    print(str1_words)
-    print(str2_words)
-    print()
+    def decrOccurance(self, decrBy = 1):
+        self.occurance -= decrBy
 
-    #now, obtain the "score". Score is the number of words in str1 which are
-    #also present in str2 (no penalty for order of words as of now)
-    score = 0
+conn = sqlite3.connect('qbanks.sqlite')
+cur = conn.cursor()
 
-    for word in str1_words:
-        if word in str2_words:
-            score += 1
-    print("Score is : " + str(score))
-    return score
+cur.executescript('''
+    CREATE TABLE IF NOT EXISTS qbank(
+        key VARCHAR(20) NOT NULL PRIMARY KEY UNIQUE,
+        questions TEXT
+    );
+''')
 
-compareStr('Explain the need and significance of project report', 'What are the guidelines by planning commission for project report?')
+def _extractQuestions(qlist):
+    qns = []
+    for entry in qlist:
+        qns.append(entry[QUESTION])
+    return qns
+
+
+
+
+
+#########################################################
+############ IMPORTANT!!!!!!!!! #########################
+######## POSSIBILITY OF SQL INJECTION ###################
+########## WHEREVER "key" is USED #######################
+#########################################################
+################# VALIDATE HERE #########################
+
+def _fetchQFromDB(key):
+    key = key.lower()
+    cur.execute('''SELECT questions FROM qbank WHERE key = ?''', (key,) )
+    qlist = json.loads(cur.fetchone()[0] )
+    return qlist
+
+def _commitQToDB(key, qlist):
+    key = key.lower()
+    toDump = json.dumps(qlist)
+    cur.execute('''UPDATE qbank SET questions = ? WHERE key = ?''', (toDump,key))
+    conn.commit()
+
+########################################################
+########################################################
+########################################################
+########################################################
+
+
+def getSuggestions(key, newQuestion, numSuggestions = 4):
+    qlist = _fetchQFromDB(key)
+    qns = _extractQuestions(qlist)
+    qnsScore = [qcomp.compareStr(newQuestion, q) for q in qns]
+    qnsCombined = list(zip(qns, qnsScore))
+    qnsCombined = sorted(qnsCombined, key = lambda x: x[1], reverse=True)
+    qnsCombined = qnsCombined[:numSuggestions]
+    return [q for q,n in qnsCombined]
+
+def getQuestions(key):
+    qlist = _fetchQFromDB(key)
+    return qlist
+
+def append(key, question):
+    key = key.lower()
+    qlist = _fetchQFromDB(key)
+    qlist.append({QUESTION: question, OCCURANCE:1 })
+    _commitQToDB(key, qlist)
+
+def set(key, question, occurance):
+    qlist = _fetchQFromDB(key)
+    for entry in qlist:
+        if entry[QUESTION] == question:
+            entry[OCCURANCE] = occurance
+    _commitQToDB(key, qlist)
+
+def updateQuestion(key, oldQuestion, newQuestion):
+    qlist = _fetchQFromDB(key)
+    for entry in qlist:
+        if entry[QUESTION] == oldQuestion:
+            entry[QUESTION] = newQuestion
+            break
+    _commitQToDB(key, qlist)
+
+def delete(key, question):
+    qlist = _fetchQFromDB(key)
+
+    for i in range(len(qlist)):
+        if qlist[i][QUESTION] == question:
+            del qlist[i]
+            break
+    _commitQToDB(key, qlist)
