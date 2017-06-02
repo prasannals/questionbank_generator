@@ -92,11 +92,14 @@ def append(key, question):
     qlist.append({QUESTION: question, OCCURANCE:1 })
     _commitQToDB(key, qlist)
 
-def set(key, question, occurance):
+def setOccurance(key, question, occurance = None):
     qlist = _fetchQFromDB(key)
     for entry in qlist:
         if entry[QUESTION] == question:
-            entry[OCCURANCE] = occurance
+            if occurance == None:
+                entry[OCCURANCE] += 1
+            else:
+                entry[OCCURANCE] = occurance
     _commitQToDB(key, qlist)
 
 def updateQuestion(key, oldQuestion, newQuestion):

@@ -1,6 +1,7 @@
 from flask import Flask
 from flask import request
 import qbank
+import json
 
 QUESTION = 'question'
 ACTION = 'action'
@@ -9,7 +10,7 @@ NEW = 'new'
 
 host = '0.0.0.0'
 portNumber = 12223
-app = Flash(__name__)
+app = Flask(__name__)
 
 @app.route('/<key>', methods=['GET'])
 def keyGet(key):
@@ -26,6 +27,12 @@ def keyPost(key):
         qbank.append(key, question)
         return _serverAllQuestions(key)
 
+@app.route('/<key>', methods=['PUT'])
+def keyUpdate(key):
+    question = request.form.get(QUESTION)
+    qbank.setOccurance(key, question)
+    return _serverAllQuestions(key)
+
 
 @app.route('/<key>', methods=['DELETE'])
 def keyDel(key):
@@ -38,4 +45,4 @@ def _serverAllQuestions(key):
     return json.dumps(qbank.getQuestions(key))
 
 if __name__ == '__main__':
-    app.run(host=host, port=portNumber, threaded=True)
+    app.run(host=host, port=portNumber, threaded=False)
